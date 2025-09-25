@@ -10,8 +10,9 @@ const noteSchema = new mongoose.Schema({
 
     },
     contributors: [{ 
-        type: mongoose.Schema.Types.ObjectId,
-         ref: 'User'
+        // type: mongoose.Schema.Types.ObjectId,
+        //  ref: 'User'              
+        type: String               // for testing
         }]
 })
 
