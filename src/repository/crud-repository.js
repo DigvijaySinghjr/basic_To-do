@@ -47,7 +47,7 @@ class CrudRepository {
 
     async update(id, data) {
         try {
-            const result =  await this.model.updateOne(id, data, {new: true});     // new true returns post update value
+            const result =  await this.model.updateOne({_id: id}, data, {new: true});     // new true returns post update value
             return result;
         } catch (error) {
             console.log('Something went wrong in the crud repo while updating:', error);
