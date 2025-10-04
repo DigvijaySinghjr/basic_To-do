@@ -1,6 +1,12 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import connect from './config/db_config.js';
+import passport from 'passport';
+import session from 'express-session';
+import 'dotenv/config'
+
+
+import './config/passport-config.js';
 
 import { addAssociateNotes } from '../helper.js';
 
@@ -18,9 +24,36 @@ app.use(bodyParser.urlencoded({ extended: false }));
 
 
 
-app.get('/', (req, res) => {
-    res.send("hello world")
-});
+app.use(session({
+  secret: 'keyboard cat',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false }
+}))
+
+//Auth passport
+// Initialize passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+
+
+app.get('/auth/login',
+    passport.authenticate('google', { scope: ['profile', 'email'] }));
+  
+    
+  app.get('/auth/login/callback', 
+    (req, res, next) => { console.log('callback query:', req.query); next(); },
+    passport.authenticate('google', { failureRedirect: '/' }),
+    function(req, res) {
+      // Successful authentication
+      res.redirect('/me');
+    });
+
+
+
+
+
 
 app.post('/createUser', async (req, res) =>{                  //create user
     console.log('req reqched for creating');
@@ -79,9 +112,6 @@ app.patch('/addContributor', async (req, res) => {      // we'll get user's id f
     }
 })
 
-
-
-
 app.patch('/addAssociateNotes', async(req, res) => {   
     try {
         const associateNotes = await addAssociateNotes(req.body.userId, req.body.noteId)     //calling helper func
@@ -90,14 +120,11 @@ app.patch('/addAssociateNotes', async(req, res) => {
         console.error('Error fetching note:', error);
         res.status(500).json({ error: 'Failed to fetch note' });
     }
-
 })
 
 
-
-
 app.listen(port, async () => {
-    console.log(`listening on ${port}`);
+    console.log(`listening on http://localhost:${port}`);
     await connect();
     console.log('mongo Db connected');
 });

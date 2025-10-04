@@ -13,6 +13,23 @@ const userSchema = mongoose.Schema({
         ref: 'Note',
     //    required: true,
     }],
+    googleId: {
+        type: String,
+        sparse: true,  // Allows multiple null values
+        unique: true,
+    //    validate: { validator(v) { return this.provider !== 'google' || !!v; } }
+      },
+      provider: {
+        type: String,
+        enum: ['local', 'google'],
+        default: 'local',
+      },
+      email: {
+        type: String,
+        required: true,
+        unique: true,
+        lowercase: true                         //normalize
+      },
 }, {timestamps: true});
 
 const User = mongoose.model('User', userSchema);
