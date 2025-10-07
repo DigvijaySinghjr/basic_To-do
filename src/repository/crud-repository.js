@@ -35,9 +35,9 @@ class CrudRepository {
         }
     }
 
-    async getAll() {
+    async getAll(filter = {}) {
         try {
-            const result = await this.model.find();     // also find({})
+            const result = await this.model.find(filter);
             return result;
         } catch (error) {
             console.log('Something went wrong in the crud repo while getting all:', error);
