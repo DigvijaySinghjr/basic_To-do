@@ -1,6 +1,6 @@
 # To-Do App
 
-A collaborative notes and to-do application built with Node.js, Express, and MongoDB. Supports real-time collaboration and role-based permissions.
+A collaborative notes and to-do application built with Node.js, Express, and MongoDB. Supports multi-user collaboration and role-based permissions.
 
 ## Features
 - Create, update, and delete notes/to-dos
