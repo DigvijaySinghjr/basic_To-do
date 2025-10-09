@@ -23,7 +23,8 @@ passport.use(new GoogleStrategy({
     name: profile.displayName ?? 'Google User',
     googleId: profile.id,
     provider: 'google',
-    email: profile.emails?.[0]?.value ?? `${profile.id}@google.local`
+    email: profile.emails?.[0]?.value ?? `${profile.id}@google.local`,
+    role: 'user' // Default role for new Google users
   });
   return cb(null, created);
   }

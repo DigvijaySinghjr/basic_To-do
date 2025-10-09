@@ -13,6 +13,7 @@ import { addAssociateNotes, removeAssociateNotes } from '../helper.js';
 
 import NoteRepository from './repository/note-repository.js';
 import UserRepository from './repository/user-repository.js';
+import { ensureAuthenticated, authorize } from './middleware/authMiddleware.js';
 
 const noteRepository = new NoteRepository();
 const userRepository = new UserRepository();
@@ -52,16 +53,20 @@ app.get('/auth/login',
     passport.authenticate('google', { scope: ['profile', 'email'] }));
   
     
-  app.get('/auth/login/callback', 
-    (req, res, next) => { console.log('callback query:', req.query); next(); },
-    passport.authenticate('google', { failureRedirect: '/' }),
-    function(req, res) {
-      // Successful authentication
-      res.redirect('/me');
-    });
+  app.get('/auth/login/callback',
+    passport.authenticate('google', {
+      failureRedirect: '/',
+      successRedirect: '/me'
+    })
+  );
 
-
-
+// This route returns the authenticated user's info, or 401 if not logged in
+app.get('/me', (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Not authenticated' });
+  }
+  return res.json({ user: req.user });
+});
 
 
 
@@ -78,25 +83,37 @@ app.post('/createUser', async (req, res) =>{                  //create user
 
 
 
-app.post('/addNotes', async (req, res) => {       // creating notes
-    const note = await noteRepository.create({
-        content: req.body.content,
-        //contributors: req.body.contributors
-        owner: req.body.userId                   
-    });
+app.post('/addNotes', ensureAuthenticated, authorize('addNotes'), async (req, res) => { // creating notes
+    try {
+        const note = await noteRepository.create({
+            content: req.body.content,
+            //contributors: req.body.contributors
+            owner: req.user.id
+        });
 
-    // Add the note to the user's associateNotes list
-    addAssociateNotes(req.body.userId, note.id);                 //id of note is genrated just above
+        // Wait for associateNotes to be updated before responding
+        await addAssociateNotes(req.user.id, note.id); // id of note is generated just above
 
-    console.log('no response was send');
-    res.json(note);
-})
+        res.json(note);
+    } catch (error) {
+        console.error('Error in /addNotes:', error);
+        res.status(500).json({ error: 'Failed to add note' });
+    }
+});
 
 
 // The noteId should be provided as a route parameter, not a literal string.
 // So, use :noteId in the route to get it from the URL.
-app.patch('/updateNotes/:noteId', async (req, res) => {
+app.patch('/updateNotes/:noteId', ensureAuthenticated, authorize('updateNotes'), async (req, res) => {
     try {
+        // Only owner or contributor can update
+        const current = await noteRepository.get(req.params.noteId);
+        const userId = req.user.id;
+        const isOwner = current && String(current.owner) === String(userId);
+        const isContributor = current && current.contributors && current.contributors.map(String).includes(String(userId));
+        if (!isOwner && !isContributor) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
         const note = await noteRepository.update(req.params.noteId, {
             content: req.body.content
         });
@@ -107,7 +124,7 @@ app.patch('/updateNotes/:noteId', async (req, res) => {
     }
 })
 
-app.get('/getNotes/:noteId', async (req, res) => {          
+app.get('/getNotes/:noteId', ensureAuthenticated, authorize('getNotes'), async (req, res) => {          
     try {
         const userId = req.user.id;               // fetch userId from session
         const note = await noteRepository.getForUser(req.params.noteId, userId);
@@ -121,7 +138,7 @@ app.get('/getNotes/:noteId', async (req, res) => {
     }
 })
 
-app.get('/getAllNotes', async (req, res) => {          
+app.get('/getAllNotes', ensureAuthenticated, authorize('getAllNotes'), async (req, res) => {          
     try {                                                  // fetch userId from session and  (not provided in params or body)
         const userId = req.user.id;
         const notes = await noteRepository.getAllForUser(userId);
@@ -132,8 +149,15 @@ app.get('/getAllNotes', async (req, res) => {
     }
 })
 
-app.delete('/deleteNotes/:noteId', async (req, res) => {
+app.delete('/deleteNotes/:noteId', ensureAuthenticated, authorize('deleteNotes'), async (req, res) => {
     try {
+        // Only owner can delete
+        const current = await noteRepository.get(req.params.noteId);
+        const userId = req.user.id;
+        const isOwner = current && String(current.owner) === String(userId);
+        if (!isOwner) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
         const notes = await noteRepository.destroy(req.params.noteId)
         return res.json(notes)
     } catch (error) {
@@ -142,7 +166,7 @@ app.delete('/deleteNotes/:noteId', async (req, res) => {
     }
 })
 
-app.patch('/removeContributor', async (req, res) => {
+app.patch('/removeContributor', ensureAuthenticated, authorize('removeContributor'), async (req, res) => {
     try {
         const note = await noteRepository.get(req.body.noteId);
         const idx = note.contributors.indexOf(req.body.userId);
@@ -159,7 +183,7 @@ app.patch('/removeContributor', async (req, res) => {
 });
 
 
-app.patch('/addContributor', async (req, res) => {      // we'll get user's id from frontend
+app.patch('/addContributor', ensureAuthenticated, authorize('addContributor'), async (req, res) => {      // we'll get user's id from frontend
     try {
         // Fetch the note by its id
         const note = await noteRepository.get(req.body.noteId);
